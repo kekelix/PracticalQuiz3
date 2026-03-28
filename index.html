@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Solar System</title>
+  <script src="script/aframe.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&family=Exo+2:wght@300;400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { overflow: hidden; background: #000; font-family: 'Exo 2', sans-serif; }
+
+    #title-bar {
+      position: fixed; top: 0; left: 0; right: 0;
+      display: flex; align-items: center; justify-content: center;
+      padding: 14px 24px;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, transparent 100%);
+      z-index: 200; pointer-events: none;
+    }
+    #title-bar h1 {
+      font-family: 'Orbitron', monospace; font-size: 15px; font-weight: 600;
+      letter-spacing: 6px; text-transform: uppercase;
+      color: #fff; opacity: 0.9;
+      text-shadow: 0 0 24px rgba(255, 200, 80, 0.5);
+    }
+    #title-bar .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #ffaa33; box-shadow: 0 0 12px #fa0, 0 0 24px #f60;
+      margin-right: 14px;
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.35; transform: scale(0.6); }
+    }
+
+    #planet-panel {
+      position: fixed; bottom: 28px; left: 50%;
+      transform: translateX(-50%) translateY(18px);
+      background: rgba(3, 6, 18, 0.86);
+      border: 1px solid rgba(255, 200, 80, 0.18);
+      border-radius: 12px; padding: 13px 30px; text-align: center;
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      opacity: 0; transition: opacity 0.3s ease, transform 0.3s ease;
+      pointer-events: none; z-index: 200; min-width: 240px;
+      box-shadow: 0 4px 40px rgba(255,160,40,0.08), inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+    #planet-panel.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #planet-panel .p-name {
+      font-family: 'Orbitron', monospace; font-size: 13px; font-weight: 700;
+      letter-spacing: 4px; color: #ffd580;
+      text-shadow: 0 0 12px rgba(255, 200, 80, 0.55);
+    }
+    #planet-panel .p-info {
+      font-size: 10.5px; font-weight: 300;
+      color: rgba(255, 220, 150, 0.45); letter-spacing: 2px; margin-top: 5px;
+    }
+
+    #controls {
+      position: fixed; top: 58px; right: 18px;
+      display: flex; flex-direction: column; gap: 5px; z-index: 200;
+    }
+    #controls label {
+      font-size: 8.5px; letter-spacing: 2.5px; color: rgba(255,255,255,0.28);
+      text-transform: uppercase; text-align: right;
+      font-family: 'Orbitron', monospace; margin-bottom: 3px;
+    }
+    .ctrl-btn {
+      background: rgba(6, 10, 28, 0.8);
+      border: 1px solid rgba(255,200,80,0.15);
+      border-radius: 7px; color: rgba(255,210,120,0.6);
+      font-family: 'Orbitron', monospace; font-size: 9.5px;
+      letter-spacing: 1.5px; padding: 7px 14px; cursor: pointer;
+      transition: all 0.2s; backdrop-filter: blur(8px); text-align: center;
+    }
+    .ctrl-btn:hover { background: rgba(80,50,10,0.5); border-color: rgba(255,200,80,0.45); color: #ffe; }
+    .ctrl-btn.active {
+      background: rgba(100,65,0,0.55); border-color: rgba(255,200,80,0.65);
+      color: #fff; box-shadow: 0 0 12px rgba(255,160,30,0.18);
+    }
+
+    #hint {
+      position: fixed; bottom: 18px; right: 20px; font-size: 9px;
+      letter-spacing: 1.5px; color: rgba(255,255,255,0.2);
+      text-transform: uppercase; pointer-events: none; z-index: 200;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="title-bar">
+    <div class="dot"></div>
+    <h1>Solar System</h1>
+  </div>
+
+  <div id="planet-panel">
+    <div class="p-name" id="p-name">—</div>
+    <div class="p-info" id="p-info">—</div>
+  </div>
+
+  <div id="controls">
+    <label>Speed</label>
+    <button class="ctrl-btn"        onclick="setSpeed(0.25,this)">0.25×</button>
+    <button class="ctrl-btn active" onclick="setSpeed(1,   this)">1×</button>
+    <button class="ctrl-btn"        onclick="setSpeed(3,   this)">3×</button>
+    <button class="ctrl-btn"        onclick="setSpeed(8,   this)">8×</button>
+  </div>
+
+  <div id="hint">Drag to look · Hover planets</div>
+
+  <a-scene
+    background="color: #00000d"
+    renderer="antialias: true; colorManagement: true"
+    vr-mode-ui="enabled: false"
+  >
+
+    <!-- ═══════════ ASSETS — preload all textures by exact filename ═══════════ -->
+    <a-assets timeout="20000">
+      <img id="2k_stars_milky_way" src="texture/2k_stars_milky_way.jpg"   crossorigin="anonymous" />
+      <img id="2k_stars"           src="texture/2k_stars.jpg"             crossorigin="anonymous" />
+      <img id="2k_sun"             src="texture/2k_sun.jpg"               crossorigin="anonymous" />
+      <img id="2k_mercury"         src="texture/2k_mercury.jpg"           crossorigin="anonymous" />
+      <img id="2k_venus_surface"   src="texture/2k_venus_surface.jpg"     crossorigin="anonymous" />
+      <img id="2k_venus_atmosphere" src="texture/2k_venus_atmosphere.jpg" crossorigin="anonymous" />
+      <img id="2k_earth_daymap"    src="texture/2k_earth_daymap.jpg"      crossorigin="anonymous" />
+      <img id="2k_moon"            src="texture/2k_moon.jpg"              crossorigin="anonymous" />
+      <img id="2k_mars"            src="texture/2k_mars.jpg"              crossorigin="anonymous" />
+      <img id="2k_jupiter"         src="texture/2k_jupiter.jpg"           crossorigin="anonymous" />
+      <img id="2k_saturn"          src="texture/2k_saturn.jpg"            crossorigin="anonymous" />
+      <img id="2k_saturn_ring_alpha" src="texture/2k_saturn_ring_alpha.png" crossorigin="anonymous" />
+      <img id="2k_uranus"          src="texture/2k_uranus.jpg"            crossorigin="anonymous" />
+      <img id="2k_neptune"         src="texture/2k_neptune.jpg"           crossorigin="anonymous" />
+    </a-assets>
+
+    <!-- ═══════════ DEEP SPACE BACKGROUND ═══════════
+         Outer sphere: 2k_stars_milky_way.jpg  — full Milky Way panorama
+         Inner sphere: 2k_stars.jpg            — dense star field, offset rotation for parallax depth -->
+    <a-sky src="#2k_stars_milky_way" radius="950" rotation="15 -55 8"></a-sky>
+    <a-sphere radius="880" segments-height="32" segments-width="32" rotation="-8 120 -5"
+      material="src: #2k_stars; side: back; shader: flat; opacity: 0.55; transparent: true"
+    ></a-sphere>
+
+    <!-- ═══════════ CAMERA ═══════════ -->
+    <a-entity id="cam-rig" position="0 24 72"
+      look-controls="pointerLockEnabled: false"
+      wasd-controls="enabled: false">
+      <a-camera fov="58" near="0.05" far="3000"></a-camera>
+    </a-entity>
+
+    <!-- ═══════════ LIGHTING ═══════════
+         Realistic: Sun is the ONLY light source in the solar system.
+         Planets are dark on the side facing away from the Sun.
+         Ambient is nearly black — just enough to see dark sides faintly.
+         The Sun itself is self-lit (emissive).                         -->
+    <a-light type="ambient"  color="#080814"  intensity="0.8"></a-light>
+    <!-- Primary solar light — warm white, physically correct falloff -->
+    <a-light type="point"    color="#fff8e8"  intensity="6.0"
+             position="0 0 0" distance="800"  decay="1.5"
+             castShadow="false"></a-light>
+    <!-- Very faint blue ambient fill — simulates distant star scatter -->
+    <a-light type="directional" color="#0a0820" intensity="0.12"
+             position="-200 80 -300"></a-light>
+
+    <!-- ═══════════ SUN ═══════════ -->
+    <a-sphere id="sun"
+      position="0 0 0" radius="5.0"
+      segments-height="64" segments-width="64"
+      material="src: #2k_sun; shader: flat"
+      animation="property: rotation; to: 0 360 0; dur: 60000; easing: linear; loop: true"
+    ></a-sphere>
+    <!-- Corona glow — layered halos -->
+    <a-sphere position="0 0 0" radius="5.6"
+      material="color:#ff9900; opacity:0.10; transparent:true; side:back; shader:flat"></a-sphere>
+    <a-sphere position="0 0 0" radius="6.4"
+      material="color:#ff6600; opacity:0.05; transparent:true; side:back; shader:flat"></a-sphere>
+    <a-sphere position="0 0 0" radius="7.5"
+      material="color:#ff3300; opacity:0.025; transparent:true; side:back; shader:flat"></a-sphere>
+
+    <!-- ═══════════ ORBIT RINGS — thin, uniform white ═══════════ -->
+    <!-- tube="0.008" = very thin; opacity 0.15 = subtle, not distracting -->
+    <a-torus radius="9"  tube="0.008" rotation="90 0 0" segments-radial="180"
+      material="color:#ffffff; opacity:0.15; transparent:true; shader:flat"></a-torus>
+    <a-torus radius="14" tube="0.008" rotation="90 0 0" segments-radial="180"
+      material="color:#ffffff; opacity:0.15; transparent:true; shader:flat"></a-torus>
+    <a-torus radius="20" tube="0.008" rotation="90 0 0" segments-radial="180"
+      material="color:#ffffff; opacity:0.15; transparent:true; shader:flat"></a-torus>
+    <a-torus radius="27" tube="0.008" rotation="90 0 0" segments-radial="180"
+      material="color:#ffffff; opacity:0.15; transparent:true; shader:flat"></a-torus>
+    <a-torus radius="37" tube="0.008" rotation="90 0 0" segments-radial="180"
+      material="color:#ffffff; opacity:0.15; transparent:true; shader:flat"></a-torus>
+    <a-torus radius="49" tube="0.008" rotation="90 0 0" segments-radial="180"
+      material="color:#ffffff; opacity:0.15; transparent:true; shader:flat"></a-torus>
+    <a-torus radius="61" tube="0.008" rotation="90 0 0" segments-radial="180"
+      material="color:#ffffff; opacity:0.15; transparent:true; shader:flat"></a-torus>
+    <a-torus radius="73" tube="0.008" rotation="90 0 0" segments-radial="180"
+      material="color:#ffffff; opacity:0.15; transparent:true; shader:flat"></a-torus>
+
+    <!-- ═══════════ MERCURY  87.97 days → 14448 ms ═══════════ -->
+    <a-entity id="mercury-orbit"
+      animation="property: rotation; to: 0 360 0; dur: 14448; easing: linear; loop: true">
+      <a-sphere class="planet"
+        data-name="Mercury" data-info="87.97 days · 0.39 AU · Ø 4,879 km"
+        position="9 0 0" radius="0.50"
+        segments-height="36" segments-width="36"
+        material="src: #2k_mercury; roughness: 0.95; metalness: 0.0; shader: standard"
+        animation="property: rotation; to: 0 360 0; dur: 9616; easing: linear; loop: true"
+      ></a-sphere>
+    </a-entity>
+
+    <!-- ═══════════ VENUS  224.70 days → 36912 ms ═══════════ -->
+    <a-entity id="venus-orbit"
+      animation="property: rotation; to: 0 360 0; dur: 36912; easing: linear; loop: true">
+
+      <!-- Venus surface (radar-mapped, orange-brown) -->
+      <a-sphere class="planet"
+        data-name="Venus" data-info="224.70 days · 0.72 AU · Ø 12,104 km"
+        position="14 0 0" radius="1.20"
+        segments-height="48" segments-width="48"
+        material="src: #2k_venus_surface; roughness: 0.92; metalness: 0.0; shader: standard"
+        animation="property: rotation; from: 0 360 0; to: 0 0 0; dur: 39917; easing: linear; loop: true"
+      ></a-sphere>
+      <!-- Venus thick CO₂ atmosphere — yellowish haze layer -->
+      <a-sphere position="14 0 0" radius="1.25"
+        material="src: #2k_venus_atmosphere; shader: flat; transparent: true; opacity: 0.52; side: front"
+        animation="property: rotation; from: 0 310 0; to: 0 0 0; dur: 52000; easing: linear; loop: true"
+      ></a-sphere>
+
+    </a-entity>
+
+    <!-- ═══════════ EARTH  365.25 days → 60000 ms ═══════════ -->
+    <a-entity id="earth-orbit"
+      animation="property: rotation; to: 0 360 0; dur: 60000; easing: linear; loop: true">
+
+      <a-sphere class="planet"
+        data-name="Earth" data-info="365.25 days · 1.00 AU · Ø 12,742 km"
+        id="earth-sphere" position="20 0 0" radius="1.27"
+        segments-height="48" segments-width="48"
+        material="src: #2k_earth_daymap; roughness: 0.62; metalness: 0.0; shader: standard"
+        animation="property: rotation; to: 0 360 0; dur: 10000; easing: linear; loop: true"
+      ></a-sphere>
+
+      <!-- Moon  27.3 days → 4484 ms -->
+      <a-entity position="20 0 0"
+        animation="property: rotation; to: 0 360 0; dur: 4484; easing: linear; loop: true">
+        <a-sphere position="2.6 0 0" radius="0.35"
+          segments-height="24" segments-width="24"
+          material="src: #2k_moon; roughness: 0.95; metalness: 0.0; shader: standard"
+          animation="property: rotation; to: 0 360 0; dur: 4484; easing: linear; loop: true"
+        ></a-sphere>
+      </a-entity>
+
+    </a-entity>
+
+    <!-- ═══════════ MARS  686.97 days → 112854 ms ═══════════ -->
+    <a-entity id="mars-orbit"
+      animation="property: rotation; to: 0 360 0; dur: 112854; easing: linear; loop: true">
+      <a-sphere class="planet"
+        data-name="Mars" data-info="686.97 days · 1.52 AU · Ø 6,779 km"
+        position="27 0 0" radius="0.68"
+        segments-height="36" segments-width="36"
+        material="src: #2k_mars; roughness: 0.90; metalness: 0.0; shader: standard"
+        animation="property: rotation; to: 0 360 0; dur: 10300; easing: linear; loop: true"
+      ></a-sphere>
+    </a-entity>
+
+    <!-- ═══════════ JUPITER  11.86 yr → 711720 ms ═══════════ -->
+    <a-entity id="jupiter-orbit"
+      animation="property: rotation; to: 0 360 0; dur: 711720; easing: linear; loop: true">
+      <a-sphere class="planet"
+        data-name="Jupiter" data-info="11.86 years · 5.20 AU · Ø 139,820 km"
+        position="37 0 0" radius="3.60"
+        segments-height="64" segments-width="64"
+        material="src: #2k_jupiter; roughness: 0.72; metalness: 0.0; shader: standard"
+        animation="property: rotation; to: 0 360 0; dur: 4200; easing: linear; loop: true"
+      ></a-sphere>
+    </a-entity>
+
+    <!-- ═══════════ SATURN  29.46 yr → 1767420 ms ═══════════ -->
+    <a-entity id="saturn-orbit"
+      animation="property: rotation; to: 0 360 0; dur: 1767420; easing: linear; loop: true">
+
+      <a-entity id="saturn-group" position="49 0 0">
+
+        <a-sphere class="planet"
+          data-name="Saturn" data-info="29.46 years · 9.58 AU · Ø 116,460 km"
+          position="0 0 0" radius="3.00"
+          segments-height="64" segments-width="64"
+          material="src: #2k_saturn; roughness: 0.80; metalness: 0.0; shader: standard"
+          animation="property: rotation; to: 0 360 0; dur: 4500; easing: linear; loop: true"
+        ></a-sphere>
+
+        <!-- Rings — tilted 26.7° (real axial tilt) -->
+        <a-entity rotation="26.7 0 0">
+          <!-- Outer ring disc with alpha texture -->
+          <a-circle radius="6.6" segments="128"
+            material="src: #2k_saturn_ring_alpha; transparent: true; opacity: 0.92;
+                      side: double; alphaTest: 0.04; shader: flat"
+          ></a-circle>
+          <!-- Inner black mask — hides ring over planet body -->
+          <a-circle radius="3.15" segments="64"
+            material="color:#000000; transparent:false; side:double; shader:flat"
+          ></a-circle>
+        </a-entity>
+
+      </a-entity>
+    </a-entity>
+
+    <!-- ═══════════ URANUS  84.01 yr → 5040660 ms ═══════════
+         Axial tilt 97.77° — rolls on its side                  -->
+    <a-entity id="uranus-orbit"
+      animation="property: rotation; to: 0 360 0; dur: 5040660; easing: linear; loop: true">
+      <a-sphere class="planet"
+        data-name="Uranus" data-info="84.01 years · 19.18 AU · Ø 50,724 km"
+        position="61 0 0" radius="2.10"
+        segments-height="48" segments-width="48"
+        rotation="0 0 97.77"
+        material="src: #2k_uranus; roughness: 0.85; metalness: 0.0; shader: standard"
+        animation="property: rotation; to: 0 360 360; dur: 6200; easing: linear; loop: true"
+      ></a-sphere>
+    </a-entity>
+
+    <!-- ═══════════ NEPTUNE  164.79 yr → 9887400 ms ═══════════ -->
+    <a-entity id="neptune-orbit"
+      animation="property: rotation; to: 0 360 0; dur: 9887400; easing: linear; loop: true">
+      <a-sphere class="planet"
+        data-name="Neptune" data-info="164.79 years · 30.07 AU · Ø 49,244 km"
+        position="73 0 0" radius="2.0"
+        segments-height="48" segments-width="48"
+        material="src: #2k_neptune; roughness: 0.85; metalness: 0.0; shader: standard"
+        animation="property: rotation; to: 0 360 0; dur: 5800; easing: linear; loop: true"
+      ></a-sphere>
+    </a-entity>
+
+  </a-scene>
+
+  <script>
+    // ── Orbital base durations (ms at 1× speed) ──
+    const BASE_DUR = {
+      'mercury-orbit': 14448,
+      'venus-orbit':   36912,
+      'earth-orbit':   60000,
+      'mars-orbit':    112854,
+      'jupiter-orbit': 711720,
+      'saturn-orbit':  1767420,
+      'uranus-orbit':  5040660,
+      'neptune-orbit': 9887400,
+    };
+
+    function setSpeed(s, btn) {
+      document.querySelectorAll('.ctrl-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      Object.entries(BASE_DUR).forEach(([id, base]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.setAttribute('animation',
+          `property: rotation; to: 0 360 0; dur: ${Math.round(base/s)}; easing: linear; loop: true`);
+      });
+    }
+
+    // ── Planet hover panel ──
+    const panel = document.getElementById('planet-panel');
+    const pName = document.getElementById('p-name');
+    const pInfo = document.getElementById('p-info');
+
+    function showPanel(name, info) {
+      pName.textContent = name;
+      pInfo.textContent = info;
+      panel.classList.add('visible');
+    }
+    function hidePanel() { panel.classList.remove('visible'); }
+
+    document.querySelector('a-scene').addEventListener('loaded', () => {
+      document.querySelectorAll('.planet').forEach(el => {
+        el.addEventListener('mouseenter', () => showPanel(el.dataset.name, el.dataset.info));
+        el.addEventListener('mouseleave', hidePanel);
+      });
+      const sun = document.getElementById('sun');
+      sun.addEventListener('mouseenter', () => showPanel('The Sun', 'G2V · 1,392,700 km · 5,778 K surface'));
+      sun.addEventListener('mouseleave', hidePanel);
+    });
+  </script>
+</body>
+</html>
